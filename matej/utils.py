@@ -58,9 +58,11 @@ def get_followers(G):
     nodes, followers = zip(*playlists)
     return nodes, followers
 
-def subsample_graph_uniform(G, k):
-    sampled_nodes = random.sample(G.nodes, 50000)
-    sampled_graph = G.subgraph(sampled_nodes)
+def subsample_graph_uniform(G, k, remove_isolates=True):
+    sampled_nodes = random.sample(G.nodes, k)
+    sampled_graph = G.subgraph(sampled_nodes).copy()
+    if remove_isolates:
+        sampled_graph.remove_nodes_from(list(nx.isolates(sampled_graph)))
     return sampled_graph
 
 def project_graph(G, onto="playlist"):
@@ -81,6 +83,7 @@ def stratified_by_followers(G, num_buckets=None, bucket_edges=None):
     else:
         bucket_edges = np.array(bucket_edges)
         num_buckets = len(bucket_edges) - 1
+
 
     # Assign each node to a bucket
     node_ids_out = []
@@ -103,6 +106,21 @@ def stratified_by_followers(G, num_buckets=None, bucket_edges=None):
 
     return np.array(node_ids_out), np.array(bucket_indices), bucket_edges.tolist()
 
+def balance_buckets(node_ids, buckets, edges, ref_bucket):
+    num_buckets = len(edges) - 1
+    k = np.sum(buckets == ref_bucket)
+    node_bins = []
+    bucket_bins = []
+    for bi in range(num_buckets):
+        samp = np.random.permutation(k)
+        node_bins.append(node_ids[buckets == bi][samp])
+        bucket_bins.append(np.array([bi] * k))
+    node_ids = np.concatenate(node_bins)
+    buckets = np.concatenate(bucket_bins)
+    samp = np.random.permutation(len(node_ids))
+    return node_ids[samp], buckets[samp], edges
+
+
 
 def get_train_test(node_ids, buckets, ratio=0.7, shuffle=True):
     split = round(len(node_ids) * ratio)
@@ -115,22 +133,29 @@ def read_graph(name):
     return nx.read_graphml(f"graphs/{name}/{name}.graphml")
 
 
-
 if __name__ == "__main__":
 
-    # G = nx.Graph()
-    # #load_file(G, "../playlist_graph/playlist_graph_0-99.graphml")
-    # load_folder(G, "../playlist_graph")
-    # print(len(G))
-    # sampled_graph = subsample_graph_uniform(G, 100000)
-    # nx.write_graphml(sampled_graph, "playlist_graph_mini.graphml")
+    G = nx.Graph()
+    #load_file(G, "../playlist_graph/playlist_graph_0-99.graphml")
+    load_folder(G, "../playlist_graph")
+    print(len(G))
+    sampled_graph = subsample_graph_uniform(G, 50000)
+    nx.write_graphml(sampled_graph, "graphs/mini/mini.graphml")
 
-    G = nx.read_graphml("graphs/mini/mini.graphml")
+    sampled_mid = subsample_graph_uniform(G, 200000)
+    nx.write_graphml(sampled_mid, "graphs/mid/mid.graphml")
+
+
+    G = nx.read_graphml("graphs/mid/mid.graphml")
 
     tracks = {n for n, d in G.nodes(data=True) if d.get("type") == "track"}
     playlists = {n for n, d in G.nodes(data=True) if d.get("type") == "playlist"}
 
     print(len(tracks), len(playlists))
+    print(len([n for n in tracks if len(list(G.neighbors(n))) == 0]))
+    print(len([n for n in playlists if len(list(G.neighbors(n))) == 0]))
+
+
     plot_distributions([get_degree_dist(G, tracks)], loglog=True)
     plot_distributions([get_degree_dist(G, playlists)], loglog=True)
 

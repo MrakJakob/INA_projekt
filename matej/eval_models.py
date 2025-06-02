@@ -4,7 +4,7 @@ import pandas as pd
 import networkx as nx
 from sklearn.metrics import accuracy_score, recall_score, f1_score
 from utils import project_graph, get_train_test, stratified_by_followers, get_followers
-from models import NeighborMean, TrackDegree
+from models import NeighborMean, TrackDegree, Majority, Spectral
 
 
 if __name__ == "__main__":
@@ -22,11 +22,17 @@ if __name__ == "__main__":
     ts_nodes, ts_buckets = np.array(test_df["nodes"]), np.array(test_df["buckets"])
     edges = np.load(f"{gdir}/{gname}_edges.npy")
 
-    model = NeighborMean()
+    print("CC in G:", [len(c) for c in sorted(nx.connected_components(G), key=len, reverse=True)])
+    print("CC in projection:", [len(c) for c in sorted(nx.connected_components(projection), key=len, reverse=True)])
+    print(f"total nodes: ", len(G))
+    print(f"train/test playlists: {len(tr_nodes)}/{len(ts_nodes)}")
+
 
     models = {
         "Neighbor Mean": NeighborMean(),
-        "Track Degree": TrackDegree()
+        "Track Degree": TrackDegree(),
+        "Majority": Majority(),
+        "Spectral": Spectral()
     }
 
     all_scores = {}
@@ -34,6 +40,10 @@ if __name__ == "__main__":
         model.init_data(G, projection, ts_nodes, edges)
         model.train(tr_nodes, tr_buckets)
         pred = model.predict(ts_nodes)
+
+        # followers = get_followers(G)[1]
+        # for tr, pr, f in zip(ts_buckets, pred, followers):
+        #     print(tr, pr, f)
 
         scores = {
             "ca": accuracy_score(ts_buckets, pred),

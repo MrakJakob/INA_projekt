@@ -2,6 +2,8 @@ import numpy as np
 import networkx as nx
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
+from sklearn.manifold import SpectralEmbedding
+
 
 class BaseModel():
 
@@ -22,13 +24,21 @@ class BaseModel():
 
     def predict(self, test_nodes: np.ndarray[str]) -> np.ndarray[int]:
         # return predictions here
+        pass    
+
+class Majority(BaseModel):
+
+    def init_data(self, G, projection, test_nodes, edges):
         pass
 
+    def train(self, train_nodes, train_buckets):
+        vals, counts = np.unique(train_buckets, return_counts=True)
+        self.majority = vals[np.argmax(counts)]
+
+    def predict(self, test_nodes):
+        return (np.ones_like(test_nodes) * self.majority).astype(int)
 
 class NeighborMean(BaseModel):
-
-    def __init__(self):
-        self.name = "Neighbor Mean"
 
     def init_data(self, G, projection, test_nodes, edges):
         self.proj = projection
@@ -72,7 +82,26 @@ class TrackDegree(BaseModel):
     def predict(self, test_nodes):
         avg_degs = self._track_degs(test_nodes)
         return self.fitter.predict(avg_degs.reshape(-1, 1))
-        
+
+class Spectral(BaseModel):
+
+    def init_data(self, G, projection, test_nodes, edges):
+        adj_matrix = nx.to_numpy_array(projection)
+        embedder = SpectralEmbedding(n_components=16, affinity='precomputed')
+        self.x = embedder.fit_transform(adj_matrix)
+        self.node_to_index = {node: i for i, node in enumerate(list(projection.nodes()))}
+
+        self.fitter = LogisticRegression()
+
+    def train(self, train_nodes, train_buckets):
+        train_idx = [self.node_to_index[n] for n in train_nodes]
+        self.fitter.fit(self.x[train_idx], train_buckets)
+
+    def predict(self, test_nodes):
+        test_idx = [self.node_to_index[n] for n in test_nodes]
+        return self.fitter.predict(self.x[test_idx])    
+
+                
     
 
     

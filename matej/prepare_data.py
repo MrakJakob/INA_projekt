@@ -2,7 +2,8 @@ import sys
 import numpy as np
 import pandas as pd
 import networkx as nx
-from utils import project_graph, get_train_test, stratified_by_followers, get_followers
+from utils import project_graph, get_train_test, stratified_by_followers, \
+                    get_followers, balance_buckets
 
 
 if __name__ == "__main__":
@@ -19,6 +20,7 @@ if __name__ == "__main__":
 
     max_followers = np.max(get_followers(G)[1])
     node_ids, buckets, edges = stratified_by_followers(G, bucket_edges=[0, 20, max_followers])
+    node_ids, buckets, edges = balance_buckets(node_ids, buckets, edges, ref_bucket=1)
     #node_ids, buckets, edges = stratified_by_followers(G, num_buckets=3)
     tr_nodes, tr_buckets, ts_nodes, ts_buckets = get_train_test(node_ids, buckets, ratio=0.7)
 
