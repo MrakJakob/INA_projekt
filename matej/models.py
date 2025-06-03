@@ -66,6 +66,7 @@ class NeighborMean(BaseModel):
         predictions = []
         for n in test_nodes:
             neighbors = list(self.proj.neighbors(n))
+            #predictions.append(self.proj.nodes[n]["followers"])
             if len(neighbors) == 0:
                 predictions.append(self.edges[0])
             else:
