@@ -3,7 +3,6 @@ import pandas as pd
 import math
 import numpy as np
 from tqdm import tqdm  # For progress bars
-from network_analysis_features.utils_copy import get_followers, get_train_test, project_graph, stratified_by_followers
 
 def save_graph_to_graphml(G, output_file):
     """
@@ -53,12 +52,12 @@ def compute_network_features_popularity(G, playlist_nodes, track_nodes):
         
         # Network features
         features[pid] = {
-            'degree': len(track_neighbors),
+            # 'degree': len(track_neighbors),
             'track_playlist_freq_mean': np.mean(track_popularities),
-            'track_playlist_freq_median': np.median(track_popularities),
+            # 'track_playlist_freq_median': np.median(track_popularities),
             'track_playlist_freq_std': np.std(track_popularities) if len(track_popularities) > 1 else 0,
-            'track_playlist_freq_max': max(track_popularities),
-            'track_playlist_freq_min': min(track_popularities),
+            # 'track_playlist_freq_max': max(track_popularities),
+            # 'track_playlist_freq_min': min(track_popularities),
             'track_playlist_freq_range': max(track_popularities) - min(track_popularities),
         }
         
@@ -96,11 +95,11 @@ def compute_network_features_popularity(G, playlist_nodes, track_nodes):
 
 
 
-graph_name = "uniformly_sampled_playlist_tracks_15000_balanced.graphml"
-projection_graph_name = "uniformly_sampled_playlist_tracks_15000_balanced_projection.graphml"
+graph_name = "5000_playlists_balanced.graphml"
+projection_graph_name = "5000_playlists_balanced_projection.graphml"
 # === Load Graph ===
 print("Loading graph...")
-dir = "./network_analysis_features/graphs"
+dir = "./matej/graphs/5K_playlists/balanced"
 graph_path = f"{dir}/{graph_name}"
 G = nx.read_graphml(graph_path)
 print(f"Graph loaded with {len(G.nodes())} nodes and {len(G.edges())} edges")
@@ -113,7 +112,7 @@ num_playlists = len(playlist_nodes)
 print(f"Found {num_playlists} playlists and {len(track_nodes)} tracks")
 
 # === Projected Playlist–Playlist Graph ===
-print("\nCreating playlist-playlist projection...")
+print("\nOpening playlist-playlist projection...")
 from networkx.algorithms import bipartite
 
 # Load the saved projection if it exists
@@ -122,12 +121,21 @@ P_proj = nx.read_graphml(projection_path)
 if P_proj is None:
     print("Projection not found, exiting...")
     exit()
-# P_proj = project_graph(G)
-# nx.write_graphml(P_proj, projection_path)
+
+# add inverse weights
+for u, v, d in P_proj.edges(data=True):
+    d["inv_weight"] = 1 / d["weight"]
 
 
 print("Calculating pagerank scores...")
 pagerank_scores = nx.pagerank(P_proj, weight="weight")
+print("Computing clustering coefficients...")
+clustering_coeffs = nx.clustering(P_proj, weight='weight') # Use real weights to measure local density of strong connections
+print("Computing betweenness centrality...")
+betweeness_centrality = nx.betweenness_centrality(P_proj, normalized=True, weight='inv_weight') # More shared tracks = shorter distance
+print("Computing closeness centrality...")
+closeness_centrality = nx.closeness_centrality(P_proj, distance='inv_weight') # More shared tracks = shorter distance
+
 
 # calculate popularity features
 popularity_features = compute_network_features_popularity(G, playlist_nodes, track_nodes)
@@ -182,23 +190,26 @@ for p in tqdm(playlist_nodes, desc="Processing playlists"):
         "avg_track_idf": avg_track_idf,
         "collaborative": 1 if pdata.get("collaborative") == "true" else 0,
         "pagerank": pagerank_scores.get(p, 0),
+        "clustering_coefficient": clustering_coeffs.get(p, 0),
+        "betweenness_centrality": betweeness_centrality.get(p, 0),
+        "closeness_centrality": closeness_centrality.get(p, 0),
         "track_diversity_hhi": popularity_features.get(p).get('track_diversity_hhi', 1.0),
         "track_diversity_entropy": popularity_features.get(p).get('track_diversity_entropy', 0),
         "track_playlist_freq_mean": popularity_features.get(p).get('track_playlist_freq_mean', 0),
-        "track_playlist_freq_median": popularity_features.get(p).get('track_playlist_freq_median', 0),
+        # "track_playlist_freq_median": popularity_features.get(p).get('track_playlist_freq_median', 0),
         "track_playlist_freq_std": popularity_features.get(p).get('track_playlist_freq_std', 0),
-        "track_playlist_freq_max": popularity_features.get(p).get('track_playlist_freq_max', 0),
-        "track_playlist_freq_min": popularity_features.get(p).get('track_playlist_freq_min', 0),
+        # "track_playlist_freq_max": popularity_features.get(p).get('track_playlist_freq_max', 0),
+        # "track_playlist_freq_min": popularity_features.get(p).get('track_playlist_freq_min', 0),
         "track_playlist_freq_range": popularity_features.get(p).get('track_playlist_freq_range', 0),
         "rare_tracks_count": popularity_features.get(p).get('rare_tracks_count', 0),
         "rare_tracks_ratio": popularity_features.get(p).get('rare_tracks_ratio', 0),
         "common_tracks_count": popularity_features.get(p).get('common_tracks_count', 0),
         "common_tracks_ratio": popularity_features.get(p).get('common_tracks_ratio', 0),
-        "degree": popularity_features.get(p).get('degree', 0),  
+        # "degree": popularity_features.get(p).get('degree', 0),  
     })
 
 # === Save to CSV ===
 print("\nSaving features to CSV...")
 df_features = pd.DataFrame(features)
-df_features.to_csv(f"network_analysis_features/features/playlist_graph_features_15000_balanced.csv", index=False)
-print("Successfully saved features to playlist_graph_features_15000_balanced.csv")
+df_features.to_csv(f"./matej/features/5000_playlists_features_balanced.csv", index=False)
+print("Successfully saved features to 5000_playlists_features_balanced.csv")
