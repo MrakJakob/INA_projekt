@@ -11,6 +11,10 @@ if __name__ == "__main__":
     gname = sys.argv[1]
     gdir = f"graphs/{gname}"
 
+    # Uncomment if you want to generate the necessary files for the 5K playlists graph
+    #gdir = f"./matej/graphs/5K_playlists/balanced"
+    #gname = "5000_playlists_balanced"
+
     print(f"Preparing data in {gdir}...")
 
     G = nx.read_graphml(f"{gdir}/{gname}.graphml")
@@ -19,8 +23,9 @@ if __name__ == "__main__":
     nx.write_graphml(projection, f"{gdir}/{gname}_projection.graphml")
 
     max_followers = np.max(get_followers(G)[1])
-    node_ids, buckets, edges = stratified_by_followers(G, bucket_edges=[0, 20, max_followers])
-    node_ids, buckets, edges = balance_buckets(node_ids, buckets, edges, ref_bucket=1)
+    node_ids, buckets, edges = stratified_by_followers(G, bucket_edges=[0, 10, max_followers])
+    # next line is not necessary for the balanced dataset
+    # node_ids, buckets, edges = balance_buckets(node_ids, buckets, edges, ref_bucket=1)
     #node_ids, buckets, edges = stratified_by_followers(G, num_buckets=3)
     tr_nodes, tr_buckets, ts_nodes, ts_buckets = get_train_test(node_ids, buckets, ratio=0.7)
 
