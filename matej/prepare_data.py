@@ -24,8 +24,9 @@ if __name__ == "__main__":
 
     max_followers = np.max(get_followers(G)[1])
     node_ids, buckets, edges = stratified_by_followers(G, bucket_edges=[0, 10, max_followers])
-    # next line is not necessary for the balanced dataset
-    # node_ids, buckets, edges = balance_buckets(node_ids, buckets, edges, ref_bucket=1)
+    # next line is not necessary for the balanced dataset - 
+    #  it can stay, shouldn't do anything if its already balanced
+    node_ids, buckets, edges = balance_buckets(node_ids, buckets, edges, ref_bucket=1)
     #node_ids, buckets, edges = stratified_by_followers(G, num_buckets=3)
     tr_nodes, tr_buckets, ts_nodes, ts_buckets = get_train_test(node_ids, buckets, ratio=0.7)
 

@@ -84,25 +84,13 @@ def stratified_by_followers(G, num_buckets=None, bucket_edges=None):
         bucket_edges = np.array(bucket_edges)
         num_buckets = len(bucket_edges) - 1
 
+    bucket_edges[-1] += 1
 
-    # Assign each node to a bucket
     node_ids_out = []
     bucket_indices = []
 
-    for node, count in zip(node_ids, follower_counts):
-        for i in range(num_buckets):
-            low = bucket_edges[i]
-            high = bucket_edges[i + 1]
-            if i == num_buckets - 1:
-                if low <= count <= high:
-                    node_ids_out.append(node)
-                    bucket_indices.append(i)
-                    break
-            else:
-                if low <= count < high:
-                    node_ids_out.append(node)
-                    bucket_indices.append(i)
-                    break
+    bucket_indices = np.digitize(follower_counts, bucket_edges) - 1
+    node_ids_out = node_ids
 
     return np.array(node_ids_out), np.array(bucket_indices), bucket_edges.tolist()
 
@@ -146,23 +134,23 @@ if __name__ == "__main__":
     nx.write_graphml(sampled_mid, "graphs/mid/mid.graphml")
 
 
-    G = nx.read_graphml("graphs/mid/mid.graphml")
+    # G = nx.read_graphml("graphs/mid/mid.graphml")
 
-    tracks = {n for n, d in G.nodes(data=True) if d.get("type") == "track"}
-    playlists = {n for n, d in G.nodes(data=True) if d.get("type") == "playlist"}
+    # tracks = {n for n, d in G.nodes(data=True) if d.get("type") == "track"}
+    # playlists = {n for n, d in G.nodes(data=True) if d.get("type") == "playlist"}
 
-    print(len(tracks), len(playlists))
-    print(len([n for n in tracks if len(list(G.neighbors(n))) == 0]))
-    print(len([n for n in playlists if len(list(G.neighbors(n))) == 0]))
+    # print(len(tracks), len(playlists))
+    # print(len([n for n in tracks if len(list(G.neighbors(n))) == 0]))
+    # print(len([n for n in playlists if len(list(G.neighbors(n))) == 0]))
 
 
-    plot_distributions([get_degree_dist(G, tracks)], loglog=True)
-    plot_distributions([get_degree_dist(G, playlists)], loglog=True)
+    # plot_distributions([get_degree_dist(G, tracks)], loglog=True)
+    # plot_distributions([get_degree_dist(G, playlists)], loglog=True)
 
-    playlist_projection = bipartite.weighted_projected_graph(G, playlists)
-    plot_distributions([get_degree_dist(playlist_projection)], loglog=True)
+    # playlist_projection = bipartite.weighted_projected_graph(G, playlists)
+    # plot_distributions([get_degree_dist(playlist_projection)], loglog=True)
 
-    max_followers = np.max(get_followers(G)[1])
-    node_ids, bucket_indices, buckets = stratified_by_followers(G, bucket_edges=[0, 20, max_followers])
-    for i in range(2):
-        print(f"Bucket {i} [{buckets[i]:.1f} - {buckets[i+1]:.1f}]: {sum(b == i for b in bucket_indices)} nodes")
+    # max_followers = np.max(get_followers(G)[1])
+    # node_ids, bucket_indices, buckets = stratified_by_followers(G, bucket_edges=[0, 20, max_followers])
+    # for i in range(2):
+    #     print(f"Bucket {i} [{buckets[i]:.1f} - {buckets[i+1]:.1f}]: {sum(b == i for b in bucket_indices)} nodes")
