@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import networkx as nx
 from utils import project_graph, get_train_test, stratified_by_followers, \
-                    get_followers, balance_buckets
+                    get_followers, balance_buckets, project_graph_thresholded
 
 
 if __name__ == "__main__":
@@ -12,22 +12,24 @@ if __name__ == "__main__":
     gdir = f"graphs/{gname}"
 
     # Uncomment if you want to generate the necessary files for the 5K playlists graph
-    #gdir = f"./matej/graphs/5K_playlists/balanced"
+    #gdir = f"./graphs/5K_playlists/balanced"
     #gname = "5000_playlists_balanced"
 
     print(f"Preparing data in {gdir}...")
 
     G = nx.read_graphml(f"{gdir}/{gname}.graphml")
     
+    # SWITCH TO "THRESHOLDED" FOR SMALLER PROJECTION GRAPH
     projection = project_graph(G)
+    # projection = project_graph_thresholded(G, 2)
+
     nx.write_graphml(projection, f"{gdir}/{gname}_projection.graphml")
 
     max_followers = np.max(get_followers(G)[1])
     node_ids, buckets, edges = stratified_by_followers(G, bucket_edges=[0, 10, max_followers])
-    # next line is not necessary for the balanced dataset - 
-    #  it can stay, shouldn't do anything if its already balanced
+    
+    # UNCOMMENT NEXT LINE IF DATASET IS ALREADY BALANCED
     node_ids, buckets, edges = balance_buckets(node_ids, buckets, edges, ref_bucket=1)
-    #node_ids, buckets, edges = stratified_by_followers(G, num_buckets=3)
     tr_nodes, tr_buckets, ts_nodes, ts_buckets = get_train_test(node_ids, buckets, ratio=0.7)
 
     for i in range(len(edges) - 1):

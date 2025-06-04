@@ -2,6 +2,7 @@ import numpy as np
 import networkx as nx
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
 from sklearn.manifold import SpectralEmbedding
 import torch
 import torch.nn as nn
@@ -12,6 +13,9 @@ import networkx as nx
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score, f1_score, roc_auc_score, classification_report, confusion_matrix, roc_curve
 from typing import Dict, List, Optional
+
+from sentence_transformers import SentenceTransformer
+from utils import get_playlists_tracks
 
 class BaseModel():
 
@@ -81,8 +85,10 @@ class TrackDegree(BaseModel):
         avg_degs = []
         for n in nodes:
             track_degs = np.array([self.G.degree(nb) for nb in self.G.neighbors(n)])
-            avg_degs.append(np.mean(track_degs) if len(track_degs) > 0 else 0)
+            avg_degs.append(np.sum(track_degs) if len(track_degs) > 0 else 0)
         return np.array(avg_degs)
+        #return np.array([self.G.degree[n] < 10 for n in nodes])
+
 
     def train(self, train_nodes, train_buckets):        
         avg_degs = self._track_degs(train_nodes)
@@ -100,6 +106,26 @@ class Spectral(BaseModel):
         self.x = embedder.fit_transform(adj_matrix)
         self.node_to_index = {node: i for i, node in enumerate(list(projection.nodes()))}
 
+        self.fitter = LogisticRegression()
+
+    def train(self, train_nodes, train_buckets):
+        train_idx = [self.node_to_index[n] for n in train_nodes]
+        self.fitter.fit(self.x[train_idx], train_buckets)
+
+    def predict(self, test_nodes):
+        test_idx = [self.node_to_index[n] for n in test_nodes]
+        return self.fitter.predict(self.x[test_idx])    
+
+class NameEmbedding(BaseModel):
+
+    def init_data(self, G, projection, test_nodes, edges):
+        self.text_embedder = SentenceTransformer('all-MiniLM-L6-v2')
+        playlists, tracks = get_playlists_tracks(G)
+        pl_names = [G.nodes[n]['name'] for n in playlists]
+        self.pl_emb = self.text_embedder.encode(pl_names)
+        self.node_to_index = {n: i for i, n in enumerate(playlists)}
+
+        self.x = self.pl_emb
         self.fitter = LogisticRegression()
 
     def train(self, train_nodes, train_buckets):

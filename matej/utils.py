@@ -1,3 +1,4 @@
+from itertools import combinations
 import os
 import random
 import numpy as np
@@ -58,17 +59,36 @@ def get_followers(G):
     nodes, followers = zip(*playlists)
     return nodes, followers
 
-def subsample_graph_uniform(G, k, remove_isolates=True):
+def subsample_graph_uniform(G, k, remove_isolates=True, giant_component_only=False):
     sampled_nodes = random.sample(G.nodes, k)
     sampled_graph = G.subgraph(sampled_nodes).copy()
     if remove_isolates:
         sampled_graph.remove_nodes_from(list(nx.isolates(sampled_graph)))
+    if giant_component_only:
+        cc = max(nx.connected_components(sampled_graph), key=len)
+        sampled_graph = sampled_graph.subgraph(cc).copy()
     return sampled_graph
 
 def project_graph(G, onto="playlist"):
     proj_nodes = {n for n, d in G.nodes(data=True) if d.get("type") == onto}
     projection = bipartite.weighted_projected_graph(G, proj_nodes)
     return projection
+
+def project_graph_thresholded(G, threshold):
+    playlists, tracks = get_playlists_tracks(G)
+    tracks = set(tracks)
+
+    proj = nx.Graph()
+    proj.add_nodes_from((n, G.nodes[n]) for n in playlists)
+
+    for u, v in combinations(playlists, 2):
+        neighbors_u = set(G.neighbors(u)) & tracks
+        neighbors_v = set(G.neighbors(v)) & tracks
+        common = neighbors_u & neighbors_v
+        if len(common) >= threshold:
+            proj.add_edge(u, v, weight=len(common))
+
+    return proj
 
 def stratified_by_followers(G, num_buckets=None, bucket_edges=None):
 
@@ -108,8 +128,6 @@ def balance_buckets(node_ids, buckets, edges, ref_bucket):
     samp = np.random.permutation(len(node_ids))
     return node_ids[samp], buckets[samp], edges
 
-
-
 def get_train_test(node_ids, buckets, ratio=0.7, shuffle=True):
     split = round(len(node_ids) * ratio)
     idx = np.random.permutation(len(node_ids)) if shuffle else np.arange(0, len(node_ids))
@@ -120,6 +138,11 @@ def get_train_test(node_ids, buckets, ratio=0.7, shuffle=True):
 def read_graph(name):
     return nx.read_graphml(f"graphs/{name}/{name}.graphml")
 
+def get_playlists_tracks(G):
+    playlists = [n for n, d in G.nodes(data=True) if d['type'] == 'playlist']
+    tracks = [n for n, d in G.nodes(data=True) if d['type'] == 'track']
+    return playlists, tracks
+
 
 if __name__ == "__main__":
 
@@ -127,11 +150,14 @@ if __name__ == "__main__":
     #load_file(G, "../playlist_graph/playlist_graph_0-99.graphml")
     load_folder(G, "../playlist_graph")
     print(len(G))
-    sampled_graph = subsample_graph_uniform(G, 50000)
-    nx.write_graphml(sampled_graph, "graphs/mini/mini.graphml")
+    sampled_graph = subsample_graph_uniform(G, 50000, giant_component_only=True)
+    nx.write_graphml(sampled_graph, "graphs/test_mini/test_mini.graphml")
 
-    sampled_mid = subsample_graph_uniform(G, 200000)
-    nx.write_graphml(sampled_mid, "graphs/mid/mid.graphml")
+    # sampled_mid = subsample_graph_uniform(G, 200000)
+    # nx.write_graphml(sampled_mid, "graphs/mid/mid.graphml")
+
+    # sampled_test = subsample_graph_uniform(G, 100000, giant_component_only=True)
+    # nx.write_graphml(sampled_test, "graphs/test/test.graphml")
 
 
     # G = nx.read_graphml("graphs/mid/mid.graphml")
