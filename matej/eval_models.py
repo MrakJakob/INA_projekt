@@ -6,12 +6,15 @@ import networkx as nx
 from sklearn.metrics import accuracy_score, recall_score, f1_score, precision_score
 from models import NeighborMean, TrackDegree, Majority, Spectral, NameEmbedding
 from gnn import GraphSAGEBasic
+from neural_network import NeuralClassifier
 
 
 if __name__ == "__main__":
-
     gname = sys.argv[1]
     gdir = f"graphs/{gname}"
+    #gname = "1000_playlists_balanced"
+    #gdir = "./matej/graphs/1K_playlists/balanced"
+    fdir = "./matej/graphs/1K_playlists/balanced/features"
 
     print(f"Training and evaluating models on data in {gdir}...")
 
@@ -22,6 +25,7 @@ if __name__ == "__main__":
     test_df = pd.read_csv(f"{gdir}/{gname}_test.csv")
     ts_nodes, ts_buckets = np.array(test_df["nodes"]), np.array(test_df["buckets"])
     edges = np.load(f"{gdir}/{gname}_edges.npy")
+    features_df = pd.read_csv(f"{fdir}/{gname}_features.csv")
 
     print("CC in G:", [len(c) for c in sorted(nx.connected_components(G), key=len, reverse=True)])
     print("CC in projection:", [len(c) for c in sorted(nx.connected_components(projection), key=len, reverse=True)])
@@ -38,6 +42,7 @@ if __name__ == "__main__":
         "GraphSAGE Random": GraphSAGEBasic(epochs=30, node_ft=None),
         "GraphSAGE Degree": GraphSAGEBasic(epochs=30, node_ft="degree"),
         "GraphSAGE Name": GraphSAGEBasic(epochs=30, node_ft="name", ft_dim=384, hidden_dim=32)
+        # "Neural Network": NeuralClassifier()
     }
 
     if len(sys.argv) > 2:
@@ -51,7 +56,7 @@ if __name__ == "__main__":
 
     all_scores = []
     for mname, model in models.items():
-        model.init_data(G, projection, ts_nodes, edges)
+        model.init_data(G, projection, ts_nodes, edges, features_df)
         model.train(tr_nodes, tr_buckets)
         pred = model.predict(ts_nodes)
 
