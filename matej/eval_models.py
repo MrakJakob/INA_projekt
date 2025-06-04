@@ -1,12 +1,12 @@
 import sys
+import os
 import numpy as np
 import pandas as pd
 import networkx as nx
-from sklearn.metrics import accuracy_score, recall_score, f1_score
-
+from sklearn.metrics import accuracy_score, recall_score, f1_score, precision_score
+from models import NeighborMean, TrackDegree, Majority, Spectral, NameEmbedding
+from gnn import GraphSAGEBasic
 from neural_network import NeuralClassifier
-from utils import project_graph, get_train_test, stratified_by_followers, get_followers
-from models import NeighborMean, TrackDegree, Majority, Spectral
 
 
 if __name__ == "__main__":
@@ -38,26 +38,51 @@ if __name__ == "__main__":
         "Track Degree": TrackDegree(),
         "Majority": Majority(),
         "Spectral": Spectral(),
+        "Name Embedding": NameEmbedding(),
+        "GraphSAGE Random": GraphSAGEBasic(epochs=30, node_ft=None),
+        "GraphSAGE Degree": GraphSAGEBasic(epochs=30, node_ft="degree"),
+        "GraphSAGE Name": GraphSAGEBasic(epochs=30, node_ft="name", ft_dim=384, hidden_dim=32)
         # "Neural Network": NeuralClassifier()
     }
 
-    all_scores = {}
+    if len(sys.argv) > 2:
+        mname = sys.argv[2]
+        models = {mname: models[mname]}
+
+    print("\nModels to train: ")
+    for mname in models.keys():
+        print(mname)
+    print("")
+
+    all_scores = []
     for mname, model in models.items():
         model.init_data(G, projection, ts_nodes, edges, features_df)
         model.train(tr_nodes, tr_buckets)
         pred = model.predict(ts_nodes)
+
+        os.makedirs(f"predictions/{gname}", exist_ok=True)
+        pred_df = pd.DataFrame({"true": ts_buckets, "pred": pred})
+        pred_df.to_csv(f"predictions/{gname}/{mname}.csv")
 
         # followers = get_followers(G)[1]
         # for tr, pr, f in zip(ts_buckets, pred, followers):
         #     print(tr, pr, f)
 
         scores = {
+            "model": mname,
             "ca": accuracy_score(ts_buckets, pred),
+            "precision": precision_score(ts_buckets, pred, average="binary"),
             "recall": recall_score(ts_buckets, pred, average="binary"),
             "f1": f1_score(ts_buckets, pred, average="binary")
         }
 
+        all_scores.append(scores)
         print(f"{mname}: {scores}")
+
+    os.makedirs(f"results/{gname}", exist_ok=True)
+    results_df = pd.DataFrame(all_scores)
+    results_df.to_csv(f"results/{gname}/results.csv")
+
 
 
     
