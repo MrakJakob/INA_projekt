@@ -1,3 +1,4 @@
+from collections import defaultdict
 from itertools import combinations
 import os
 import random
@@ -75,13 +76,17 @@ def project_graph(G, onto="playlist"):
     return projection
 
 def project_graph_thresholded(G, threshold):
+    print("Projecting graph...")
     playlists, tracks = get_playlists_tracks(G)
     tracks = set(tracks)
 
     proj = nx.Graph()
     proj.add_nodes_from((n, G.nodes[n]) for n in playlists)
+    n_candidates = len(playlists) ** 2
 
-    for u, v in combinations(playlists, 2):
+    for i, (u, v) in enumerate(combinations(playlists, 2)):
+        if i % 10000 == 0:
+            print(f"{round((i/n_candidates) * 100, 1)} % done")
         neighbors_u = set(G.neighbors(u)) & tracks
         neighbors_v = set(G.neighbors(v)) & tracks
         common = neighbors_u & neighbors_v
@@ -89,6 +94,41 @@ def project_graph_thresholded(G, threshold):
             proj.add_edge(u, v, weight=len(common))
 
     return proj
+
+def project_graph_thresholded_fast(G, threshold):
+    print("Projecting graph...")
+    playlists, tracks = get_playlists_tracks(G)
+    playlists = set(playlists)
+    tracks = set(tracks)
+    n_tr = len(tracks)
+    n_pl = len(playlists)
+
+    print("Building track->playlists index...")
+    track_to_playlists = defaultdict(set)
+    for i, playlist in enumerate(playlists):
+        if i % 1000 == 0:
+            print(f"{round(100 * i / n_pl)}% done")
+        for track in G.neighbors(playlist):
+            if track in tracks:
+                track_to_playlists[track].add(playlist)
+
+    print("Counting pairs...")
+    pair_counter = defaultdict(int)
+    for i, plists in enumerate(track_to_playlists.values()):
+        if i % 1000 == 0:
+            print(f"{round(100 * i / n_tr, 1)}% done")
+        for u, v in combinations(sorted(plists), 2):
+            pair_counter[(u, v)] += 1
+
+    proj = nx.Graph()
+    proj.add_nodes_from((n, G.nodes[n]) for n in playlists)
+
+    for (u, v), count in pair_counter.items():
+        if count >= threshold:
+            proj.add_edge(u, v, weight=count)
+
+    return proj
+
 
 def stratified_by_followers(G, num_buckets=None, bucket_edges=None):
 
@@ -114,8 +154,15 @@ def stratified_by_followers(G, num_buckets=None, bucket_edges=None):
 
     return np.array(node_ids_out), np.array(bucket_indices), bucket_edges.tolist()
 
-def balance_buckets(node_ids, buckets, edges, ref_bucket):
+
+def balance_buckets(node_ids, buckets, edges, ref_bucket, upsample_factor=None):
     num_buckets = len(edges) - 1
+    if upsample_factor and upsample_factor > 1:
+        lb = ref_bucket
+        lnodes = node_ids[buckets == lb]
+        lbuckets = buckets[buckets == lb]
+        node_ids = np.concatenate([node_ids, np.tile(lnodes, upsample_factor - 1)])
+        buckets = np.concatenate([buckets, np.tile(lbuckets, upsample_factor - 1)])
     k = np.sum(buckets == ref_bucket)
     node_bins = []
     bucket_bins = []
@@ -127,6 +174,27 @@ def balance_buckets(node_ids, buckets, edges, ref_bucket):
     buckets = np.concatenate(bucket_bins)
     samp = np.random.permutation(len(node_ids))
     return node_ids[samp], buckets[samp], edges
+
+def get_balanced_train_test(G, edges, ref_bucket=1, upsample_factor=None, ratio=0.7, shuffle=True):
+
+    node_ids, followers = get_followers(G)
+    split = round(len(node_ids) * ratio)
+    idx = np.random.permutation(len(node_ids)) if shuffle else np.arange(0, len(node_ids))
+    train = idx[:split]
+    test = idx[split:]
+    
+    node_ids = np.array(node_ids)
+    buckets = np.digitize(followers, edges) - 1
+
+    tr_nodes, tr_buckets = node_ids[train], buckets[train]
+    ts_nodes, ts_buckets = node_ids[test], buckets[test]
+
+    tr_nodes, tr_buckets, _ = balance_buckets(tr_nodes, tr_buckets, edges, ref_bucket, 
+                                        upsample_factor=upsample_factor)
+    ts_nodes, ts_buckets, _ = balance_buckets(ts_nodes, ts_buckets, edges, ref_bucket, 
+                                        upsample_factor=upsample_factor)
+    return tr_nodes, tr_buckets, ts_nodes, ts_buckets
+
 
 def get_train_test(node_ids, buckets, ratio=0.7, shuffle=True):
     split = round(len(node_ids) * ratio)

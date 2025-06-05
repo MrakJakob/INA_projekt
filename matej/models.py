@@ -15,6 +15,8 @@ from typing import Dict, List, Optional
 
 from sentence_transformers import SentenceTransformer
 from utils import get_playlists_tracks
+from heapq import nlargest
+
 
 
 class BaseModel:
@@ -79,6 +81,37 @@ class NeighborMean(BaseModel):
                 )
                 # nb_followers = self.proj.nodes[n]["followers"]
                 predictions.append(nb_followers)
+        return np.digitize(predictions, self.edges) - 1
+
+    
+class SimilarNeighbor(BaseModel):
+
+    def init_data(self, G, projection, test_nodes, edges, features_df=None):
+        self.G = G
+        self.edges = np.array(edges).astype(int)
+
+    def predict(self, test_nodes):
+        predictions = []
+        playlists, _ = get_playlists_tracks(self.G)
+
+        for n in test_nodes:
+            potentials = ((n, other) for other in playlists if other != n)
+
+            #aa = nx.adamic_adar_index(self.G, potentials)
+            #aa = nx.jaccard_coefficient(self.G, potentials)
+            aa = [(u, v, len(set(self.G.neighbors(u)) & set(self.G.neighbors(v))))            
+                    for u, v in potentials]
+
+            scored = [(v, score) for u, v, score in aa]
+            top = nlargest(20, scored, key=lambda x: x[1])
+            top_nodes = [n for n, s in top]
+
+
+            nb_followers = np.max(
+                [int(self.G.nodes[n]["followers"]) for n in top_nodes]
+            )
+            predictions.append(nb_followers)
+
         return np.digitize(predictions, self.edges) - 1
 
 
