@@ -4,9 +4,10 @@ import numpy as np
 import pandas as pd
 import networkx as nx
 from sklearn.metrics import accuracy_score, recall_score, f1_score, precision_score
-from models import NeighborMean, TrackDegree, Majority, Spectral, NameEmbedding, SimilarNeighbor
+from models import NeighborMean, TrackDegree, Majority, Spectral, NameEmbedding, SimilarNeighbor, Node2VecModel
 from gnn import GraphSAGEBasic
 from neural_network import NeuralClassifier
+
 
 
 if __name__ == "__main__":
@@ -39,8 +40,9 @@ if __name__ == "__main__":
         "Name Embedding": NameEmbedding(),
         "GraphSAGE Random": GraphSAGEBasic(epochs=30, node_ft=None),
         "GraphSAGE Degree": GraphSAGEBasic(epochs=30, node_ft="degree"),
-        "GraphSAGE Name": GraphSAGEBasic(epochs=30, node_ft="name", ft_dim=384, hidden_dim=32)
+        "GraphSAGE Name": GraphSAGEBasic(epochs=30, node_ft="name", ft_dim=384, hidden_dim=32),
         # "Neural Network": NeuralClassifier()
+        "Node2Vec": Node2VecModel(dimensions=128, walk_length=40, num_walks=10, p=1, q=2),
     }
 
     if len(sys.argv) > 2:
