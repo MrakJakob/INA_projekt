@@ -134,10 +134,9 @@ class GraphSAGEBasic(BaseModel):
             self.model.train()
             self.optimizer.zero_grad()
             out = self.model(self.data.x, self.data.edge_index)
-            loss = self.criterion(out[train_mask], y)
+            loss = self.criterion(out[tr_indices], y)
             loss.backward()
             self.optimizer.step()
-            print(f'Epoch {epoch}, Loss: {loss.item()}')
 
         # train_loader = NeighborLoader(
         #     self.data, input_nodes=train_mask,
@@ -165,7 +164,7 @@ class GraphSAGEBasic(BaseModel):
         with torch.no_grad():
             out = self.model(self.data.x, self.data.edge_index)
             probs = torch.sigmoid(out)
-            pred = (probs[test_mask] > 0.5).long().squeeze().detach().numpy()
+            pred = (probs[ts_indices] > 0.5).long().squeeze().detach().numpy()
         return pred
 
 if __name__ == "__main__":
