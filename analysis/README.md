@@ -101,18 +101,42 @@ Defines paths:
 ### C4. `plot_feature_roc_curves.py`
 - ROC curves for all numeric features
 
+### C5. `plot_feature_cdfs.py`
+- Normalized CDF for each feature and combined
+- Shows how features are distributed
+
 ---
 
 ## 📈 FEATURE BEHAVIOR
 
-### D1. `plot_feature_cdfs.py`
-- Normalized CDF for each feature and combined
-- Shows how features are distributed
-
-### D2. `analyze_feature_vs_followers.py`
+### D1. `analyze_feature_vs_followers.py`
 - Scatter plots: feature vs followers (log-log)
 - Calculates Spearman & Kendall correlations
 - Saves correlation bar chart
+
+---
+
+## 🧬 COMMUNITY ANALYSIS
+
+### E1. `E1_detect_communities_gpu.py`
+- Runs **Louvain community detection** on the projected playlist–playlist graph using cuGraph.
+- Uses `renumber=False` to preserve original playlist `id`.
+- Outputs:  
+  - `community_labels.csv` containing `id`, `original_id`, and assigned `louvain` community.
+
+### E2. `E2_plot_communities_vs_followers.py`
+- Visualizes how **follower counts vary across communities**.
+- Produces:
+  - `followers_by_community_log.png`: boxplot of followers per community (log-scaled)
+  - `playlist_count_per_community.png`: number of playlists per community
+
+### E3. `E3_plot_community_popularity_distribution.py`
+- Shows the **percentage of popular/unpopular playlists** (based on >10 follower rule) in each community.
+- Each bar represents 100% of playlists in a community:
+  - **Red**: % unpopular (≤10 followers)
+  - **Green**: % popular (>10 followers)
+- Playlist count is annotated above each bar for context.
+- Output: `community_popularity_distribution.png`
 
 ---
 
