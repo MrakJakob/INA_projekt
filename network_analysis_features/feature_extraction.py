@@ -95,11 +95,11 @@ def compute_network_features_popularity(G, playlist_nodes, track_nodes):
 
 
 
-graph_name = "5000_playlists_balanced.graphml"
-projection_graph_name = "5000_playlists_balanced_projection.graphml"
+graph_name = "1000_playlists_uniform.graphml"
+projection_graph_name = "1000_playlists_uniform_projection.graphml"
 # === Load Graph ===
 print("Loading graph...")
-dir = "./matej/graphs/5K_playlists/balanced"
+dir = "./matej/graphs/1K_playlists/uniform"
 graph_path = f"{dir}/{graph_name}"
 G = nx.read_graphml(graph_path)
 print(f"Graph loaded with {len(G.nodes())} nodes and {len(G.edges())} edges")
@@ -211,5 +211,5 @@ for p in tqdm(playlist_nodes, desc="Processing playlists"):
 # === Save to CSV ===
 print("\nSaving features to CSV...")
 df_features = pd.DataFrame(features)
-df_features.to_csv(f"./matej/features/5000_playlists_features_balanced.csv", index=False)
-print("Successfully saved features to 5000_playlists_features_balanced.csv")
+df_features.to_csv(f"./matej/graphs/1K_playlists/uniform/1000_playlists_features_uniform.csv", index=False)
+print("Successfully saved features to 1000_playlists_features_uniform.csv")

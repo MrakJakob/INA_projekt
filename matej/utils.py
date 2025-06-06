@@ -1,3 +1,5 @@
+from collections import defaultdict
+from itertools import combinations
 import os
 import random
 import numpy as np
@@ -58,17 +60,75 @@ def get_followers(G):
     nodes, followers = zip(*playlists)
     return nodes, followers
 
-def subsample_graph_uniform(G, k, remove_isolates=True):
+def subsample_graph_uniform(G, k, remove_isolates=True, giant_component_only=False):
     sampled_nodes = random.sample(G.nodes, k)
     sampled_graph = G.subgraph(sampled_nodes).copy()
     if remove_isolates:
         sampled_graph.remove_nodes_from(list(nx.isolates(sampled_graph)))
+    if giant_component_only:
+        cc = max(nx.connected_components(sampled_graph), key=len)
+        sampled_graph = sampled_graph.subgraph(cc).copy()
     return sampled_graph
 
 def project_graph(G, onto="playlist"):
     proj_nodes = {n for n, d in G.nodes(data=True) if d.get("type") == onto}
     projection = bipartite.weighted_projected_graph(G, proj_nodes)
     return projection
+
+def project_graph_thresholded(G, threshold):
+    print("Projecting graph...")
+    playlists, tracks = get_playlists_tracks(G)
+    tracks = set(tracks)
+
+    proj = nx.Graph()
+    proj.add_nodes_from((n, G.nodes[n]) for n in playlists)
+    n_candidates = len(playlists) ** 2
+
+    for i, (u, v) in enumerate(combinations(playlists, 2)):
+        if i % 10000 == 0:
+            print(f"{round((i/n_candidates) * 100, 1)} % done")
+        neighbors_u = set(G.neighbors(u)) & tracks
+        neighbors_v = set(G.neighbors(v)) & tracks
+        common = neighbors_u & neighbors_v
+        if len(common) >= threshold:
+            proj.add_edge(u, v, weight=len(common))
+
+    return proj
+
+def project_graph_thresholded_fast(G, threshold):
+    print("Projecting graph...")
+    playlists, tracks = get_playlists_tracks(G)
+    playlists = set(playlists)
+    tracks = set(tracks)
+    n_tr = len(tracks)
+    n_pl = len(playlists)
+
+    print("Building track->playlists index...")
+    track_to_playlists = defaultdict(set)
+    for i, playlist in enumerate(playlists):
+        if i % 1000 == 0:
+            print(f"{round(100 * i / n_pl)}% done")
+        for track in G.neighbors(playlist):
+            if track in tracks:
+                track_to_playlists[track].add(playlist)
+
+    print("Counting pairs...")
+    pair_counter = defaultdict(int)
+    for i, plists in enumerate(track_to_playlists.values()):
+        if i % 1000 == 0:
+            print(f"{round(100 * i / n_tr, 1)}% done")
+        for u, v in combinations(sorted(plists), 2):
+            pair_counter[(u, v)] += 1
+
+    proj = nx.Graph()
+    proj.add_nodes_from((n, G.nodes[n]) for n in playlists)
+
+    for (u, v), count in pair_counter.items():
+        if count >= threshold:
+            proj.add_edge(u, v, weight=count)
+
+    return proj
+
 
 def stratified_by_followers(G, num_buckets=None, bucket_edges=None):
 
@@ -94,8 +154,15 @@ def stratified_by_followers(G, num_buckets=None, bucket_edges=None):
 
     return np.array(node_ids_out), np.array(bucket_indices), bucket_edges.tolist()
 
-def balance_buckets(node_ids, buckets, edges, ref_bucket):
+
+def balance_buckets(node_ids, buckets, edges, ref_bucket, upsample_factor=None):
     num_buckets = len(edges) - 1
+    if upsample_factor and upsample_factor > 1:
+        lb = ref_bucket
+        lnodes = node_ids[buckets == lb]
+        lbuckets = buckets[buckets == lb]
+        node_ids = np.concatenate([node_ids, np.tile(lnodes, upsample_factor - 1)])
+        buckets = np.concatenate([buckets, np.tile(lbuckets, upsample_factor - 1)])
     k = np.sum(buckets == ref_bucket)
     node_bins = []
     bucket_bins = []
@@ -108,6 +175,25 @@ def balance_buckets(node_ids, buckets, edges, ref_bucket):
     samp = np.random.permutation(len(node_ids))
     return node_ids[samp], buckets[samp], edges
 
+def get_balanced_train_test(G, edges, ref_bucket=1, upsample_factor=None, ratio=0.7, shuffle=True):
+
+    node_ids, followers = get_followers(G)
+    split = round(len(node_ids) * ratio)
+    idx = np.random.permutation(len(node_ids)) if shuffle else np.arange(0, len(node_ids))
+    train = idx[:split]
+    test = idx[split:]
+    
+    node_ids = np.array(node_ids)
+    buckets = np.digitize(followers, edges) - 1
+
+    tr_nodes, tr_buckets = node_ids[train], buckets[train]
+    ts_nodes, ts_buckets = node_ids[test], buckets[test]
+
+    tr_nodes, tr_buckets, _ = balance_buckets(tr_nodes, tr_buckets, edges, ref_bucket, 
+                                        upsample_factor=upsample_factor)
+    ts_nodes, ts_buckets, _ = balance_buckets(ts_nodes, ts_buckets, edges, ref_bucket, 
+                                        upsample_factor=upsample_factor)
+    return tr_nodes, tr_buckets, ts_nodes, ts_buckets
 
 
 def get_train_test(node_ids, buckets, ratio=0.7, shuffle=True):
@@ -120,6 +206,11 @@ def get_train_test(node_ids, buckets, ratio=0.7, shuffle=True):
 def read_graph(name):
     return nx.read_graphml(f"graphs/{name}/{name}.graphml")
 
+def get_playlists_tracks(G):
+    playlists = [n for n, d in G.nodes(data=True) if d['type'] == 'playlist']
+    tracks = [n for n, d in G.nodes(data=True) if d['type'] == 'track']
+    return playlists, tracks
+
 
 if __name__ == "__main__":
 
@@ -127,11 +218,14 @@ if __name__ == "__main__":
     #load_file(G, "../playlist_graph/playlist_graph_0-99.graphml")
     load_folder(G, "../playlist_graph")
     print(len(G))
-    sampled_graph = subsample_graph_uniform(G, 50000)
-    nx.write_graphml(sampled_graph, "graphs/mini/mini.graphml")
+    sampled_graph = subsample_graph_uniform(G, 50000, giant_component_only=True)
+    nx.write_graphml(sampled_graph, "graphs/test_mini/test_mini.graphml")
 
-    sampled_mid = subsample_graph_uniform(G, 200000)
-    nx.write_graphml(sampled_mid, "graphs/mid/mid.graphml")
+    # sampled_mid = subsample_graph_uniform(G, 200000)
+    # nx.write_graphml(sampled_mid, "graphs/mid/mid.graphml")
+
+    # sampled_test = subsample_graph_uniform(G, 100000, giant_component_only=True)
+    # nx.write_graphml(sampled_test, "graphs/test/test.graphml")
 
 
     # G = nx.read_graphml("graphs/mid/mid.graphml")

@@ -102,18 +102,18 @@ def create_bipartite_graph_from_json(data_dir, sample_size=1000, max_files=None,
         # Add playlist node
         pid = f"pl_{playlist['pid']}"
         
-        # Calculate duration if not present
-        duration_ms = playlist.get('duration_ms', 0)
-        if duration_ms == 0 and 'tracks' in playlist:
-            duration_ms = sum(track['duration_ms'] for track in playlist['tracks'])
+        # # Calculate duration if not present
+        # duration_ms = playlist.get('duration_ms', 0)
+        # if duration_ms == 0 and 'tracks' in playlist:
+        #     duration_ms = sum(track['duration_ms'] for track in playlist['tracks'])
         
         G.add_node(
             pid,
             type="playlist",
             name=playlist.get('name', ''),
             followers=playlist.get('num_followers', 0),
-            duration_ms=duration_ms,
-            num_tracks=playlist.get('num_tracks', 0),
+            # duration_ms=duration_ms,
+            # num_tracks=playlist.get('num_tracks', 0),
             num_artists=playlist.get('num_artists', 0),
             num_albums=playlist.get('num_albums', 0),
             collaborative=str(playlist.get('collaborative', 'false')).lower()
@@ -130,7 +130,7 @@ def create_bipartite_graph_from_json(data_dir, sample_size=1000, max_files=None,
                     G.add_node(
                         track_uri,
                         type="track",
-                        name=track.get('track_name', ''),
+                        # name=track.get('track_name', ''),
                         # artist_name=track.get('artist_name', ''),
                         artist_uri=artist_uri,
                         # album_name=track.get('album_name', ''),
@@ -179,8 +179,9 @@ def create_and_save_bipartite_graph(data_dir, output_file, sample_size=1000, max
 
 # Example usage:
 if __name__ == "__main__":
-    data_dir = "./spotify_million_playlist_dataset/data"
+    data_dir = "./spotify_dataset_files/data"
     size = 5000
     # size
-    output_file = "./g_uniform5k/uniformly_sampled_playlist_tracks_{}.graphml".format(size)
+    output_file = "./matej/graphs/5K_playlists/uniform/{}_playlists_uniform.graphml".format(size)
     create_and_save_bipartite_graph(data_dir, output_file, sample_size=size)
+
