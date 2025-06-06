@@ -182,5 +182,6 @@ if __name__ == "__main__":
     data_dir = "./spotify_dataset_files/data"
     size = 5000
     # size
-    output_file = "./graphs/uniformly_sampled_playlist_tracks_{}.graphml".format(size)
+    output_file = "./matej/graphs/5K_playlists/uniform/{}_playlists_uniform.graphml".format(size)
     create_and_save_bipartite_graph(data_dir, output_file, sample_size=size)
+

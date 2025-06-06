@@ -12,6 +12,7 @@ import networkx as nx
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import (
     accuracy_score,
+    f1_score,
 )
 from typing import Dict, List, Optional
 from models import BaseModel
@@ -20,7 +21,7 @@ from models import BaseModel
 class PlaylistClassifier(nn.Module):
     """Improved neural network with better architecture for balanced data"""
 
-    def __init__(self, input_dim, hidden_dims=[256, 128, 64], dropout_rate=0.4):
+    def __init__(self, input_dim, hidden_dims=[128, 64, 32], dropout_rate=0.4):
         super(PlaylistClassifier, self).__init__()
 
         layers = []
@@ -41,6 +42,7 @@ class PlaylistClassifier(nn.Module):
     def forward(self, x):
         return self.network(x)
 
+
 class PlaylistDataset(Dataset):
     """Custom Dataset for playlist features"""
 
@@ -54,13 +56,14 @@ class PlaylistDataset(Dataset):
     def __getitem__(self, idx):
         return self.features[idx], self.labels[idx]
 
+
 class NeuralClassifier(BaseModel):
     """Enhanced neural network classifier inheriting from BaseModel"""
 
     def __init__(
         self,
-        hidden_dims=[256, 128, 64, 32],
-        dropout_rate=0.3,
+        hidden_dims=[128, 64, 32],
+        dropout_rate=0.4,
         num_epochs=200,
         learning_rate=0.001,
         batch_size=64,
@@ -79,7 +82,6 @@ class NeuralClassifier(BaseModel):
         # Model components
         self.model = None
         self.scaler = StandardScaler()
-
 
         # Data storage
         self.G = None
@@ -116,22 +118,20 @@ class NeuralClassifier(BaseModel):
                 "name",
                 "followers",
                 # "betweenness_centrality",
-                "avg_track_duration_ms",
+                # "avg_track_duration_ms",
                 # "closeness_centrality",
                 # "num_tracks",
                 # "unique_albums",
-                # "collaborative",
+                "collaborative",
                 # "clustering_coeff",
-                # "unique_artists",
-                # "rare_tracks_count",
-                # "common_tracks_count",
-                # "track_diversity_hhi",
+                "unique_artists",
+                "rare_tracks_count",
+                "common_tracks_count",
+                "track_diversity_hhi",
             ]
         ]
 
-    def prepare_features(
-        self, nodes: np.ndarray, buckets: np.ndarray
-    ):
+    def prepare_features(self, nodes: np.ndarray, buckets: np.ndarray):
         train_labels = pd.DataFrame({"nodes": nodes, "buckets": buckets})
 
         train_data = train_labels.merge(
@@ -143,9 +143,8 @@ class NeuralClassifier(BaseModel):
         X = train_data[feature_cols].values
         y = train_data["buckets"].values
 
-        
         X_scaled = self.scaler.fit_transform(X)
-        
+
         dataset = PlaylistDataset(X_scaled, y)
 
         loader = DataLoader(dataset, batch_size=64, shuffle=True)
@@ -182,16 +181,20 @@ class NeuralClassifier(BaseModel):
 
         self.model.eval()
         val_predictions = []
+        probabilities = []
 
         with torch.no_grad():
             for batch_features, _ in test_loader:
                 batch_features = batch_features.to(self.device)
                 outputs = self.model(batch_features)
+                probabilities.extend(torch.softmax(outputs, dim=1).cpu().numpy())
                 _, predicted = torch.max(outputs.data, 1)
                 val_predictions.extend(predicted.cpu().numpy())
 
-        return np.array(val_predictions)
-        
+        all_probabilities = np.array(probabilities)
+        # Calculate optimal threshold using Youden's J statistic
+
+        return np.array(val_predictions), all_probabilities
 
     def _train_neural_network(self, train_loader: DataLoader):
         """Internal method to train the neural network"""

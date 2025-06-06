@@ -8,20 +8,22 @@ from utils import project_graph, get_train_test, stratified_by_followers, \
 
 if __name__ == "__main__":
 
-    gname = sys.argv[1]
-    gdir = f"graphs/{gname}"
+    # gname = sys.argv[1]
+    # gdir = f"graphs/{gname}"
 
     # Uncomment if you want to generate the necessary files for the 5K playlists graph
     #gdir = f"./graphs/5K_playlists/balanced"
     #gname = "5000_playlists_balanced"
+    gdir = "./matej/graphs/5K_playlists/uniform"
+    gname = "5000_playlists_uniform"
 
     print(f"Preparing data in {gdir}...")
 
     G = nx.read_graphml(f"{gdir}/{gname}.graphml")
     
     # SWITCH TO "THRESHOLDED" FOR SMALLER PROJECTION GRAPH
-    projection = project_graph(G)
-    # projection = project_graph_thresholded(G, 2)
+    #projection = project_graph(G)
+    projection = project_graph_thresholded(G, 3)
 
     nx.write_graphml(projection, f"{gdir}/{gname}_projection.graphml")
 
@@ -29,7 +31,7 @@ if __name__ == "__main__":
     node_ids, buckets, edges = stratified_by_followers(G, bucket_edges=[0, 10, max_followers])
     
     # UNCOMMENT NEXT LINE IF DATASET IS ALREADY BALANCED
-    node_ids, buckets, edges = balance_buckets(node_ids, buckets, edges, ref_bucket=1)
+    # node_ids, buckets, edges = balance_buckets(node_ids, buckets, edges, ref_bucket=1)
     tr_nodes, tr_buckets, ts_nodes, ts_buckets = get_train_test(node_ids, buckets, ratio=0.7)
 
     for i in range(len(edges) - 1):

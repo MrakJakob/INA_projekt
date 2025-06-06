@@ -230,6 +230,13 @@ class FocalLoss(nn.Module):
         youden_index = tpr - fpr
         optimal_threshold = thresholds[np.argmax(youden_index)]
         print(f"Optimal threshold (Youden's J): {optimal_threshold:.4f}")
+        optimal_predictions = (all_probabilities[:, 1] >= optimal_threshold).astype(int)
+        optimal_accuracy = accuracy_score(all_labels, optimal_predictions)
+        optimal_f1 = f1_score(all_labels, optimal_predictions, average="weighted")
+
+        print(f"Optimal Accuracy: {optimal_accuracy:.4f}")
+        print(f"Optimal F1 Score: {optimal_f1:.4f}")
+        
         # adjust threshold using Youden's J statistic
         # all_predictions = all_probabilities[:, 1] >= optimal_threshold
 
@@ -272,6 +279,10 @@ class FocalLoss(nn.Module):
             "confusion_matrix": confusion_matrix(all_labels, all_predictions),
             "auc_score": auc_score,
             "feature_importances": feature_importances,
+            "optimal_threshold": optimal_threshold,
+            "optimal_accuracy": optimal_accuracy,
+            "optimal_f1": optimal_f1,
+
         }
 
         return results
@@ -464,20 +475,20 @@ class FocalLoss(nn.Module):
             for col in features_df.columns
             if col
             not in [
-                "playlist_id",
-                "name",
-                "followers",
-                "betweenness_centrality",
-                #"avg_track_duration_ms",
-                "closeness_centrality",
-                #"num_tracks",
-                #"unique_albums",
-                #"collaborative",
-                #"clustering_coeff",
-                #"unique_artists",
-                'rare_tracks_count',
-                'common_tracks_count',
-                'track_diversity_hhi',
+                 "playlist_id",
+            "name",
+            "followers",
+            # "betweenness_centrality",
+            # "avg_track_duration_ms",
+            # "closeness_centrality",
+            # "num_tracks",
+            # "unique_albums",
+            "collaborative",
+            # "clustering_coeff",
+            "unique_artists",
+            "rare_tracks_count",
+            "common_tracks_count",
+            "track_diversity_hhi",
             ]
         ]
 
@@ -585,14 +596,13 @@ def main():
         imbalance_strategy="weighted_loss",  # Change to 'weighted_loss', 'focal_loss'
     )
 
-    dir = "network_analysis_features"
-    graph_dir = "network_analysis_features/graphs"
-    feature_dir = "network_analysis_features/features"
-    # Prepare data (you'll need to provide the actual file paths)
+    graph_dir = "matej/graphs/5K_playlists/balanced"
+    feature_dir = "matej/graphs/5K_playlists/balanced/features"
+
     train_loader, test_loader, metadata = predictor.prepare_data(
-        train_labels_path=f"{graph_dir}/uniformly_sampled_playlist_tracks_{DATASET}_train.csv",
-        test_labels_path=f"{graph_dir}/uniformly_sampled_playlist_tracks_{DATASET}_test.csv",
-        features_path=f"{feature_dir}/playlist_graph_features_{DATASET}.csv",
+        train_labels_path=f"{graph_dir}/5000_playlists_balanced_train.csv",
+        test_labels_path=f"{graph_dir}/5000_playlists_balanced_test.csv",
+        features_path=f"{feature_dir}/5000_playlists_balanced_features.csv",
     )
 
     print("Data preparation complete!")

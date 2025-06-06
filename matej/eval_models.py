@@ -1,20 +1,20 @@
 import sys
-import os
 import numpy as np
 import pandas as pd
 import networkx as nx
-from sklearn.metrics import accuracy_score, recall_score, f1_score, precision_score
-from models import NeighborMean, TrackDegree, Majority, Spectral, NameEmbedding
-from gnn import GraphSAGEBasic
+from sklearn.metrics import accuracy_score, recall_score, f1_score
+
 from neural_network import NeuralClassifier
+from utils import project_graph, get_train_test, stratified_by_followers, get_followers
+from models import NeighborMean, TrackDegree, Majority, Spectral
 
 
 if __name__ == "__main__":
-    gname = sys.argv[1]
-    gdir = f"graphs/{gname}"
-    #gname = "1000_playlists_balanced"
-    #gdir = "./matej/graphs/1K_playlists/balanced"
-    fdir = "./matej/graphs/1K_playlists/balanced/features"
+    # gname = sys.argv[1]
+    # gdir = f"graphs/{gname}"
+    gname = "5000_playlists_balanced"
+    gdir = "./matej/graphs/5K_playlists/balanced"
+    fdir = "./matej/graphs/5K_playlists/balanced/features"
 
     print(f"Training and evaluating models on data in {gdir}...")
 
@@ -34,55 +34,47 @@ if __name__ == "__main__":
 
 
     models = {
-        "Neighbor Mean": NeighborMean(),
-        "Track Degree": TrackDegree(),
-        "Majority": Majority(),
-        "Spectral": Spectral(),
-        "Name Embedding": NameEmbedding(),
-        "GraphSAGE Random": GraphSAGEBasic(epochs=30, node_ft=None),
-        "GraphSAGE Degree": GraphSAGEBasic(epochs=30, node_ft="degree"),
-        "GraphSAGE Name": GraphSAGEBasic(epochs=30, node_ft="name", ft_dim=384, hidden_dim=32)
-        # "Neural Network": NeuralClassifier()
+        # "Neighbor Mean": NeighborMean(),
+        # "Track Degree": TrackDegree(),
+        # "Majority": Majority(),
+        # "Spectral": Spectral(),
+        "Neural Network": NeuralClassifier(num_epochs=200, dropout_rate=0.2),
+        "Neural Network 2": NeuralClassifier(num_epochs=200, dropout_rate=0.4, learning_rate=0.001),
+        "Neural Network 2": NeuralClassifier(num_epochs=200, dropout_rate=0.3, learning_rate=0.001),
     }
 
-    if len(sys.argv) > 2:
-        mname = sys.argv[2]
-        models = {mname: models[mname]}
-
-    print("\nModels to train: ")
-    for mname in models.keys():
-        print(mname)
-    print("")
-
-    all_scores = []
+    all_scores = {}
     for mname, model in models.items():
         model.init_data(G, projection, ts_nodes, edges, features_df)
         model.train(tr_nodes, tr_buckets)
-        pred = model.predict(ts_nodes)
+        pred, prob = model.predict(ts_nodes)
 
-        os.makedirs(f"predictions/{gname}", exist_ok=True)
-        pred_df = pd.DataFrame({"true": ts_buckets, "pred": pred})
-        pred_df.to_csv(f"predictions/{gname}/{mname}.csv")
+        if prob is not None:
+            from sklearn.metrics import roc_curve
+            fpr, tpr, thresholds = roc_curve(ts_buckets, prob[:, 1])
+            youden_index = tpr - fpr
+            optimal_threshold = thresholds[np.argmax(youden_index)]
+
+            # Get predictions with optimal threshold
+            optimal_predictions = (prob[:, 1] >= optimal_threshold).astype(int)
+            optimal_accuracy = accuracy_score(ts_buckets, optimal_predictions)
+            optimal_f1 = f1_score(ts_buckets, optimal_predictions, average="weighted")
+
+            print(f"{mname} - Optimal Threshold: {optimal_threshold:.4f}, "
+                    f"Accuracy: {optimal_accuracy:.4f}, F1 Score: {optimal_f1:.4f}")
+            
 
         # followers = get_followers(G)[1]
         # for tr, pr, f in zip(ts_buckets, pred, followers):
         #     print(tr, pr, f)
 
         scores = {
-            "model": mname,
             "ca": accuracy_score(ts_buckets, pred),
-            "precision": precision_score(ts_buckets, pred, average="binary"),
             "recall": recall_score(ts_buckets, pred, average="binary"),
             "f1": f1_score(ts_buckets, pred, average="binary")
         }
 
-        all_scores.append(scores)
         print(f"{mname}: {scores}")
-
-    os.makedirs(f"results/{gname}", exist_ok=True)
-    results_df = pd.DataFrame(all_scores)
-    results_df.to_csv(f"results/{gname}/results.csv")
-
 
 
     
