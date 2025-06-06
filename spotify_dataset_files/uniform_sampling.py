@@ -179,8 +179,8 @@ def create_and_save_bipartite_graph(data_dir, output_file, sample_size=1000, max
 
 # Example usage:
 if __name__ == "__main__":
-    data_dir = "./spotify_dataset_files/data"
-    size = 10000
+    data_dir = "./spotify_million_playlist_dataset/data"
+    size = 5000
     # size
-    output_file = "./graphs/uniformly_sampled_playlist_tracks_{}.graphml".format(size)
+    output_file = "./g_uniform5k/uniformly_sampled_playlist_tracks_{}.graphml".format(size)
     create_and_save_bipartite_graph(data_dir, output_file, sample_size=size)
