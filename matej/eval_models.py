@@ -16,6 +16,9 @@ if __name__ == "__main__":
     print(f"Training and evaluating models on data in {gdir}...")
 
     G = nx.read_graphml(f"{gdir}/{gname}.graphml")
+
+    G.graph["dir"] = gdir
+    G.graph["features_file"] = f"{gdir}/features/{gname}_features.csv"
     projection = nx.read_graphml(f"{gdir}/{gname}_projection.graphml")
     train_df = pd.read_csv(f"{gdir}/{gname}_train.csv")
     tr_nodes, tr_buckets = np.array(train_df["nodes"]), np.array(train_df["buckets"])
@@ -40,6 +43,8 @@ if __name__ == "__main__":
         "GraphSAGE Random": GraphSAGEBasic(epochs=30, node_ft=None),
         "GraphSAGE Degree": GraphSAGEBasic(epochs=30, node_ft="degree"),
         "GraphSAGE Name": GraphSAGEBasic(epochs=30, node_ft="name", ft_dim=384, hidden_dim=32),
+        "Neural Network": NeuralClassifier(dropout_rate=0.4, num_epochs=200, learning_rate=0.001),
+        "Node2Vec": Node2VecModel(dimensions=128, walk_length=40, num_walks=10, p=1, q=2),
         # "Neural Network": NeuralClassifier()
         "Node2Vec": Node2VecModel(dimensions=128, walk_length=40, num_walks=10, p=1, q=0.5),
     }
@@ -57,21 +62,26 @@ if __name__ == "__main__":
     for mname, model in models.items():
         model.init_data(G, projection, ts_nodes, edges)
         model.train(tr_nodes, tr_buckets)
-        pred, prob = model.predict(ts_nodes)
+        # problem, no true labels sent to predict
+        if (mname == "Neural Network" or mname == "Neural Network 2"):
+            pred, prob = model.predict(ts_nodes, ts_buckets)
+        else:
+            pred, prob = model.predict(ts_nodes)
+        
 
         if prob is not None:
             from sklearn.metrics import roc_curve
             fpr, tpr, thresholds = roc_curve(ts_buckets, prob[:, 1])
             youden_index = tpr - fpr
             optimal_threshold = thresholds[np.argmax(youden_index)]
+            
+            # # Get predictions with optimal threshold
+            # optimal_predictions = (prob[:, 1] >= optimal_threshold).astype(int)
+            # optimal_accuracy = accuracy_score(ts_buckets, optimal_predictions)
+            # optimal_f1 = f1_score(ts_buckets, optimal_predictions, average="weighted")
 
-            # Get predictions with optimal threshold
-            optimal_predictions = (prob[:, 1] >= optimal_threshold).astype(int)
-            optimal_accuracy = accuracy_score(ts_buckets, optimal_predictions)
-            optimal_f1 = f1_score(ts_buckets, optimal_predictions, average="weighted")
-
-            print(f"{mname} - Optimal Threshold: {optimal_threshold:.4f}, "
-                    f"Accuracy: {optimal_accuracy:.4f}, F1 Score: {optimal_f1:.4f}")
+            # print(f"{mname} - Optimal Threshold: {optimal_threshold:.4f}, "
+            #         f"Accuracy: {optimal_accuracy:.4f}, F1 Score: {optimal_f1:.4f}")
             
 
         # followers = get_followers(G)[1]
