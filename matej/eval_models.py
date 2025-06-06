@@ -41,7 +41,7 @@ if __name__ == "__main__":
         "GraphSAGE Degree": GraphSAGEBasic(epochs=30, node_ft="degree"),
         "GraphSAGE Name": GraphSAGEBasic(epochs=30, node_ft="name", ft_dim=384, hidden_dim=32),
         # "Neural Network": NeuralClassifier()
-        "Node2Vec": Node2VecModel(dimensions=128, walk_length=40, num_walks=10, p=2, q=1),
+        "Node2Vec": Node2VecModel(dimensions=128, walk_length=40, num_walks=10, p=1, q=0.5),
     }
 
     if len(sys.argv) > 2:
