@@ -1,5 +1,4 @@
 import sys
-import os
 import numpy as np
 import pandas as pd
 import networkx as nx
@@ -58,31 +57,34 @@ if __name__ == "__main__":
     for mname, model in models.items():
         model.init_data(G, projection, ts_nodes, edges)
         model.train(tr_nodes, tr_buckets)
-        pred = model.predict(ts_nodes)
+        pred, prob = model.predict(ts_nodes)
 
-        os.makedirs(f"predictions/{gname}", exist_ok=True)
-        pred_df = pd.DataFrame({"true": ts_buckets, "pred": pred})
-        pred_df.to_csv(f"predictions/{gname}/{mname}.csv")
+        if prob is not None:
+            from sklearn.metrics import roc_curve
+            fpr, tpr, thresholds = roc_curve(ts_buckets, prob[:, 1])
+            youden_index = tpr - fpr
+            optimal_threshold = thresholds[np.argmax(youden_index)]
+
+            # Get predictions with optimal threshold
+            optimal_predictions = (prob[:, 1] >= optimal_threshold).astype(int)
+            optimal_accuracy = accuracy_score(ts_buckets, optimal_predictions)
+            optimal_f1 = f1_score(ts_buckets, optimal_predictions, average="weighted")
+
+            print(f"{mname} - Optimal Threshold: {optimal_threshold:.4f}, "
+                    f"Accuracy: {optimal_accuracy:.4f}, F1 Score: {optimal_f1:.4f}")
+            
 
         # followers = get_followers(G)[1]
         # for tr, pr, f in zip(ts_buckets, pred, followers):
         #     print(tr, pr, f)
 
         scores = {
-            "model": mname,
             "ca": accuracy_score(ts_buckets, pred),
-            "precision": precision_score(ts_buckets, pred, average="binary"),
             "recall": recall_score(ts_buckets, pred, average="binary"),
             "f1": f1_score(ts_buckets, pred, average="binary")
         }
 
-        all_scores.append(scores)
         print(f"{mname}: {scores}")
-
-    os.makedirs(f"results/{gname}", exist_ok=True)
-    results_df = pd.DataFrame(all_scores)
-    results_df.to_csv(f"results/{gname}/results.csv")
-
 
 
     

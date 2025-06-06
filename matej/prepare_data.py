@@ -9,12 +9,14 @@ from utils import project_graph, get_train_test, stratified_by_followers, \
 
 if __name__ == "__main__":
 
-    gname = sys.argv[1]
-    gdir = f"graphs/{gname}"
+    # gname = sys.argv[1]
+    # gdir = f"graphs/{gname}"
 
     # Uncomment if you want to generate the necessary files for the 5K playlists graph
     #gdir = f"./graphs/5K_playlists/balanced"
     #gname = "5000_playlists_balanced"
+    gdir = "./matej/graphs/5K_playlists/uniform"
+    gname = "5000_playlists_uniform"
 
     print(f"Preparing data in {gdir}...")
 
