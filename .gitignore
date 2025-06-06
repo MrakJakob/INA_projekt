@@ -18,3 +18,4 @@ network_analysis_features/models.ipynb
 best_model.pth
 spotify_dataset_files/balanced_spotify_playlists_10_followers.json
 matej/graphs/5K_playlists/balanced/5000_playlists_balanced.graphml
+matej/test_neural.py

@@ -41,8 +41,8 @@ def compute_network_features_popularity(G, playlist_nodes, track_nodes):
     # Compute features for each playlist
     features = {}
     for pid in tqdm(playlist_nodes, desc="Computing network features for playlists"):
-        # Get tracks connected to this playlist
-        track_neighbors = list(G.neighbors(pid))
+        # Get tracks connected to this playlist and filter only track nodes
+        track_neighbors = [t for t in G.neighbors(pid) if t in track_nodes]
         
         if not track_neighbors:
             continue
@@ -95,11 +95,11 @@ def compute_network_features_popularity(G, playlist_nodes, track_nodes):
 
 
 
-graph_name = "1000_playlists_uniform.graphml"
-projection_graph_name = "1000_playlists_uniform_projection.graphml"
+graph_name = "uniform_5k.graphml"
+projection_graph_name = "uniform_5k_projection.graphml"
 # === Load Graph ===
 print("Loading graph...")
-dir = "./matej/graphs/1K_playlists/uniform"
+dir = "./matej/graphs/5K_playlists/uniform"
 graph_path = f"{dir}/{graph_name}"
 G = nx.read_graphml(graph_path)
 print(f"Graph loaded with {len(G.nodes())} nodes and {len(G.edges())} edges")
@@ -211,5 +211,5 @@ for p in tqdm(playlist_nodes, desc="Processing playlists"):
 # === Save to CSV ===
 print("\nSaving features to CSV...")
 df_features = pd.DataFrame(features)
-df_features.to_csv(f"./matej/graphs/1K_playlists/uniform/1000_playlists_features_uniform.csv", index=False)
-print("Successfully saved features to 1000_playlists_features_uniform.csv")
+df_features.to_csv(f"./matej/graphs/5K_playlists/uniform/features/5k_playlists_features_uniform.csv", index=False)
+print("Successfully saved features to 5k_playlists_features_uniform.csv")

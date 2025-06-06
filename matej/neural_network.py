@@ -1,3 +1,5 @@
+from pathlib import Path
+from matplotlib import pyplot as plt
 import numpy as np
 import networkx as nx
 import pandas as pd
@@ -12,7 +14,13 @@ import networkx as nx
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import (
     accuracy_score,
+    classification_report,
+    confusion_matrix,
     f1_score,
+    precision_recall_fscore_support,
+    precision_score,
+    recall_score,
+    roc_curve,
 )
 from typing import Dict, List, Optional
 from models import BaseModel
@@ -67,6 +75,7 @@ class NeuralClassifier(BaseModel):
         num_epochs=200,
         learning_rate=0.001,
         batch_size=64,
+        imbalance_strategy=None  # weighted loss
     ):
         super().__init__()
         # Set hyperparams here
@@ -95,14 +104,16 @@ class NeuralClassifier(BaseModel):
         projection: nx.Graph,
         test_nodes: np.ndarray,
         edges: np.ndarray,
-        features_df: pd.DataFrame = None,
+        #features_df: pd.DataFrame = None,
     ):
         """Initialize and preprocess graph data"""
         self.G = G
         self.projection = projection
         self.test_nodes = test_nodes
         self.edges = np.array(edges).astype(int)
-        self.features = features_df
+        self.dir = Path(G.graph.get("dir", ""))
+        features_file_path = Path(G.graph.get("features_file", ""))
+        self.features = pd.read_csv(features_file_path)
 
         # Create training projection (remove test nodes)
         self.proj_train = self.projection.copy()
@@ -171,13 +182,14 @@ class NeuralClassifier(BaseModel):
         # Train the model
         self._train_neural_network(train_loader)
 
-    def predict(self, test_nodes: np.ndarray) -> np.ndarray:
+    def predict(self, test_nodes: np.ndarray, test_labels: np.ndarray) -> np.ndarray:
         """Make predictions for test nodes"""
         if self.model is None:
             raise ValueError("Model must be trained first!")
 
         # Extract features for test nodes
         test_loader = self.prepare_features_test(test_nodes)
+        self.test_labels = test_labels
 
         self.model.eval()
         val_predictions = []
@@ -192,7 +204,39 @@ class NeuralClassifier(BaseModel):
                 val_predictions.extend(predicted.cpu().numpy())
 
         all_probabilities = np.array(probabilities)
-        # Calculate optimal threshold using Youden's J statistic
+    
+        accuracy = accuracy_score(self.test_labels, val_predictions)
+        
+        f1 = f1_score(self.test_labels, val_predictions, average="binary")
+        precision, recall, f1, support = precision_recall_fscore_support(
+            self.test_labels, val_predictions, average=None
+        )
+        weighted_f1 = f1_score(self.test_labels, val_predictions, average="weighted")
+        macro_f1 = f1_score(self.test_labels, val_predictions, average="macro")
+
+        results = {
+            "accuracy": accuracy,
+            "precision_per_class": precision,
+            "recall_per_class": recall,
+            "f1_per_class": f1,
+            "support_per_class": support,
+            "weighted_f1": weighted_f1,
+            "macro_f1": macro_f1,
+            "predictions": val_predictions,
+            "true_labels": self.test_labels,
+            "probabilities": np.array(all_probabilities),
+            "classification_report": classification_report(self.test_labels, val_predictions),
+            "confusion_matrix": confusion_matrix(self.test_labels, val_predictions),
+            # "auc_score": auc_score,
+            # "feature_importances": feature_importances,
+            # "optimal_threshold": optimal_threshold,
+            # "optimal_accuracy": optimal_accuracy,
+            # "optimal_f1": optimal_f1,
+
+        }
+
+        # Plot detailed results
+        self.plot_detailed_results(results)
 
         return np.array(val_predictions), all_probabilities
 
@@ -227,7 +271,8 @@ class NeuralClassifier(BaseModel):
         print(f"Training on {self.device}")
         print(
             f"Model architecture: {input_dim} -> {' -> '.join(map(str, self.hidden_dims))} -> 2"
-        )
+        )   
+        history = {"train_loss": [], "train_acc": [], "train_f1": []}
 
         for epoch in range(self.num_epochs):
             # Training phase
@@ -258,9 +303,140 @@ class NeuralClassifier(BaseModel):
 
             avg_train_loss = train_loss / len(train_loader)
             train_acc = accuracy_score(train_labels, train_predictions)
+            f1 = f1_score(
+                train_labels, train_predictions, average="weighted"
+            )
 
+            history["train_loss"].append(avg_train_loss)
+            history["train_acc"].append(train_acc * 100)
+            history["train_f1"].append(f1)
             if (epoch + 1) % 50 == 0:
                 print(
                     f"Epoch [{epoch+1}/{self.num_epochs}], Train Loss: {avg_train_loss:.4f}, "
                     f"Train Acc: {train_acc*100:.2f}%"
                 )
+        self.save_training_history(history)
+
+    def save_training_history(self, history: Dict):
+        """Plot training history"""
+        fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 4))
+
+        # Loss plot
+        ax1.plot(history["train_loss"])
+        ax1.set_title("Training Loss")
+        ax1.set_xlabel("Epoch")
+        ax1.set_ylabel("Loss")
+        ax1.grid(True)
+
+        # Accuracy plot
+        ax2.plot(history["train_acc"])
+        ax2.set_title("Training Accuracy")
+        ax2.set_xlabel("Epoch")
+        ax2.set_ylabel("Accuracy (%)")
+        ax2.grid(True)
+
+        # F1 Score plot
+        ax3.plot(history["train_f1"])
+        ax3.set_title("Training F1 Score")
+        ax3.set_xlabel("Epoch")
+        ax3.set_ylabel("F1 Score")
+        ax3.grid(True)
+
+        # save figure to dir 
+
+        plt.savefig(f"{self.dir}/images/neural_network_training_history.png", dpi=300)
+
+    
+    def plot_detailed_results(self, results: Dict):
+        """Plot comprehensive results for imbalanced classification"""
+        fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 10))
+
+        # Confusion Matrix
+        cm = results["confusion_matrix"]
+        labels = ["Low Followers", "High Followers"]
+
+        # Plot with matplotlib
+        im = ax1.imshow(cm, cmap="Blues")
+
+        # Title and labels
+        ax1.set_xticks([0, 1])
+        ax1.set_yticks([0, 1])
+        ax1.set_xticklabels(labels)
+        ax1.set_yticklabels(labels)
+        ax1.set_xlabel("Predicted Label")
+        ax1.set_ylabel("True Label")
+
+        # Annotate the cells with the numeric values
+        for i in range(cm.shape[0]):
+            for j in range(cm.shape[1]):
+                ax1.text(j, i, str(cm[i, j]), ha="center", va="center", color="black")
+
+        # Optional: Add colorbar
+        plt.colorbar(im, ax=ax1)
+        ax1.set_title("Confusion Matrix")
+        ax1.set_xlabel("Predicted")
+        ax1.set_ylabel("Actual")
+
+        # Per-class metrics
+        classes = ["Low Followers", "High Followers"]
+        metrics = ["Precision", "Recall", "F1-Score"]
+
+        precision = results["precision_per_class"]
+        recall = results["recall_per_class"]
+        f1 = results["f1_per_class"]
+
+        x = np.arange(len(classes))
+        width = 0.25
+
+        ax2.bar(x - width, precision, width, label="Precision", alpha=0.8)
+        ax2.bar(x, recall, width, label="Recall", alpha=0.8)
+        ax2.bar(x + width, f1, width, label="F1-Score", alpha=0.8)
+
+        ax2.set_xlabel("Classes")
+        ax2.set_ylabel("Score")
+        ax2.set_title("Per-Class Metrics")
+        ax2.set_xticks(x)
+        ax2.set_xticklabels(classes)
+        ax2.legend()
+        ax2.set_ylim(0, 1)
+
+        # Probability distribution for class 1 (high followers)
+        probs_class_1 = results["probabilities"][:, 1]
+        true_labels = results["true_labels"]
+
+        ax3.hist(
+            probs_class_1[np.array(true_labels) == 0],
+            bins=30,
+            alpha=0.7,
+            label="True Low Followers",
+            density=True,
+        )
+        ax3.hist(
+            probs_class_1[np.array(true_labels) == 1],
+            bins=30,
+            alpha=0.7,
+            label="True High Followers",
+            density=True,
+        )
+        ax3.set_xlabel("Predicted Probability (High Followers)")
+        ax3.set_ylabel("Density")
+        ax3.set_title("Probability Distribution")
+        ax3.legend()
+
+        # ROC-like plot (prediction confidence vs accuracy)
+        sorted_indices = np.argsort(probs_class_1)[::-1]
+        sorted_probs = probs_class_1[sorted_indices]
+        sorted_labels = np.array(true_labels)[sorted_indices]
+
+        cumulative_precision = np.cumsum(sorted_labels) / np.arange(
+            1, len(sorted_labels) + 1
+        )
+
+        ax4.plot(np.arange(len(sorted_labels)), cumulative_precision)
+        ax4.set_xlabel("Number of Predictions (sorted by confidence)")
+        ax4.set_ylabel("Precision")
+        ax4.set_title("Precision vs Confidence")
+        ax4.grid(True)
+
+        # save figure to file
+        plt.savefig(f"{self.dir}/images/neural_network_detailed_results.png", dpi=300)
