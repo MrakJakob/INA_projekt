@@ -10,6 +10,7 @@ with open("analysis/config.json") as f:
 output_dir = config["output_dir"]
 features_path = f"{output_dir}/all_node_features.csv"
 plot_dir = os.path.join(output_dir, "feature_plots")
+os.makedirs(plot_dir, exist_ok=True)
 
 # Load node data
 df = pd.read_csv(features_path)

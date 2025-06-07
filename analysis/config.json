@@ -1,4 +1,4 @@
 {
-  "input_graphml": "g_balanced5k/projected_playlist_playlist.graphml",
-  "output_dir": "features/balanced_5k_projected"
+  "input_graphml": "g_uniform5k/uniform_5k.graphml",
+  "output_dir": "features/uniform_5k"
 }
