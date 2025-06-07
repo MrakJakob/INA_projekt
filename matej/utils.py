@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import networkx as nx
 from networkx.algorithms import bipartite
+from scipy.stats import linregress  
 
 def load_file(G, file_path):
     print(f"📥 Loading: {file_path}")
@@ -23,6 +24,16 @@ def load_folder(G, folder_path):
         file_path = os.path.join(folder_path, file)
         load_file(G, file_path)
 
+def estimate_power_law_exponent(x, y):
+    x = np.asarray(x)
+    y = np.asarray(y)
+
+    mask = (x > 0) & (y > 0)
+    log_x = np.log(x[mask])
+    log_y = np.log(y[mask])
+    slope, intercept, r_value, p_value, std_err = linregress(log_x, log_y)
+    return slope, intercept
+
 def plot_histograms(data, labels=None, colors=None, loglog=False, xlabel="degree"):
     for i, (hist, edges) in enumerate(data):
         plt.stairs(hist, edges, label=labels[i] if labels else "",
@@ -36,19 +47,60 @@ def plot_histograms(data, labels=None, colors=None, loglog=False, xlabel="degree
         plt.yscale('log')
     plt.show()
 
-def plot_distributions(data, labels=None, colors=None, styles=None, loglog=False, xlabel="degree"):
+def plot_distributions(data, labels=None, colors=None, styles=None, loglog=False,
+                    xlabel="degree", title="", compute_exponent=False,
+                    fit_mins=None, fit_maxes=None):
     for i, (x, y) in enumerate(data):
-        plt.plot(x, y, styles[i] if styles else "-",
-                    label=labels[i] if labels else "",
-                    color=colors[i] if colors else None)
+        label = labels[i] if labels else ""
+        color = colors[i] if colors else None
+        style = styles[i] if styles else "-"
+        plt.plot(x, y, style, color=color, label=label)
+
+        if compute_exponent and loglog:
+            if fit_mins is not None and fit_maxes is not None:
+                mask = (x > fit_mins[i]) & (x <= fit_maxes[i])
+                x = x[mask]
+                y = y[mask]
+            slope, intercept = estimate_power_law_exponent(x, y)
+            x_fit = np.linspace(np.min(x[x > 0]), np.max(x), 100)
+            y_fit = np.exp(intercept) * x_fit**slope
+            plt.plot(x_fit, y_fit, "-", color=color, alpha=0.6,
+                     label=f"{label} fit (α={-slope:.2f})")
+
     plt.xlabel(xlabel)
     plt.ylabel("frequency")
+    plt.title(title)
     if labels:
         plt.legend()
     if loglog:
         plt.xscale('log')
         plt.yscale('log')
-    plt.show()
+    #plt.show()
+
+def plot_follower_distribution(data, thr, fit_max):
+    x, y = data
+    x1, y1 = x[x < thr], y[x < thr]
+    x2, y2 = x[x >= thr], y[x >= thr]
+    plt.plot(x1, y1, ".", color="blue", label=f"< 10 followers ({np.sum(y1)} total)")
+    plt.plot(x2, y2, ".", color="red", label=f">= 10 followers ({np.sum(y2)} total)")
+
+    if fit_max is not None:
+        mask = x <= fit_max
+        x = x[mask]
+        y = y[mask]
+        slope, intercept = estimate_power_law_exponent(x, y)
+        x_fit = np.linspace(np.min(x[x > 0]), np.max(x), 100)
+        y_fit = np.exp(intercept) * x_fit**slope
+        plt.plot(x_fit, y_fit, "-", color="black", alpha=0.6,
+                    label=f"followers fit (α={-slope:.2f})")
+
+    plt.xlabel("# followers")
+    plt.ylabel("frequency")
+    plt.title("Playlist followers")
+    plt.legend()
+    plt.xscale('log')
+    plt.yscale('log')
+
 
 def get_degree_dist(G, nodes=None):
     nodes = G.nodes() if nodes is None else nodes
