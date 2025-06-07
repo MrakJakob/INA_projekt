@@ -1,4 +1,5 @@
 import sys
+import os
 import numpy as np
 import pandas as pd
 import networkx as nx
@@ -31,17 +32,19 @@ if __name__ == "__main__":
 
 
     models = {
+        #"Node descriptors + NN": NeuralClassifier()
+        "GraphSAGE (random)": GraphSAGEBasic(epochs=30, node_ft=None),
+        "GraphSAGE (degree)": GraphSAGEBasic(epochs=30, node_ft="degree"),
+        "GraphSAGE (name)": GraphSAGEBasic(epochs=30, node_ft="name", ft_dim=384, hidden_dim=32),
+        #"Node2Vec + LR": Node2VecModel(dimensions=128, walk_length=40, num_walks=10, p=1, q=2),
+        "Spectral embedding + LR": Spectral(),
+        "Name embeddings + LR": NameEmbedding(),
+        "Track Degree + LR": TrackDegree(),
         "Neighbor Mean": NeighborMean(),
         #"Similar Neighbor": SimilarNeighbor(),
-        "Track Degree": TrackDegree(),
+        #"Similar Neighbor": SimilarNeighbor(),
         "Majority": Majority(),
-        "Spectral": Spectral(),
-        "Name Embedding": NameEmbedding(),
-        "GraphSAGE Random": GraphSAGEBasic(epochs=30, node_ft=None),
-        "GraphSAGE Degree": GraphSAGEBasic(epochs=30, node_ft="degree"),
-        "GraphSAGE Name": GraphSAGEBasic(epochs=30, node_ft="name", ft_dim=384, hidden_dim=32),
-        # "Neural Network": NeuralClassifier()
-        "Node2Vec": Node2VecModel(dimensions=128, walk_length=40, num_walks=10, p=1, q=2),
+        
     }
 
     if len(sys.argv) > 2:
@@ -79,13 +82,19 @@ if __name__ == "__main__":
         #     print(tr, pr, f)
 
         scores = {
+            "model": mname,
             "ca": accuracy_score(ts_buckets, pred),
+            "precision": precision_score(ts_buckets, pred, average="binary"),
             "recall": recall_score(ts_buckets, pred, average="binary"),
             "f1": f1_score(ts_buckets, pred, average="binary")
         }
 
+        all_scores.append(scores)
         print(f"{mname}: {scores}")
 
+    os.makedirs(f"results/{gname}", exist_ok=True)
+    results_df = pd.DataFrame(all_scores)
+    results_df.to_csv(f"results/{gname}/results.csv")
 
     
     
