@@ -244,6 +244,9 @@ class EnhancedNeuralClassifier:
         f1_weighted = f1_score(all_labels, all_predictions, average="weighted")
         f1_macro = f1_score(all_labels, all_predictions, average="macro")
         auc_score = roc_auc_score(all_labels, all_probabilities[:, 1])
+        recall = precision_recall_fscore_support(
+            all_labels, all_predictions, average="weighted"
+        )
 
         # Calculate optimal threshold using Youden's J statistic
         from sklearn.metrics import roc_curve
@@ -305,11 +308,12 @@ class EnhancedNeuralClassifier:
         }
 
         print(
-            f"Standard Threshold (0.5) - Accuracy: {accuracy:.4f}, F1: {f1_weighted:.4f}"
+            f"Standard Threshold (0.5) - Accuracy: {accuracy:.4f}, F1: {f1_weighted:.4f}, Recall: {recall[1]:.4f}, Precision: {precision[1]:.4f}"
         )
-        print(
-            f"Optimal Threshold ({optimal_threshold:.4f}) - Accuracy: {optimal_accuracy:.4f}, F1: {optimal_f1:.4f}"
-        )
+
+        # print(
+        #     f"Optimal Threshold ({optimal_threshold:.4f}) - Accuracy: {optimal_accuracy:.4f}, F1: {optimal_f1:.4f}"
+        # )
         print(f"AUC Score: {auc_score:.4f}")
 
         return results
@@ -553,7 +557,7 @@ def compare_classifiers(
 
     print("=== Enhanced Neural Network ===")
     nn_classifier = EnhancedNeuralClassifier(
-        hidden_dims=[128, 64, 32], dropout_rate=0.3
+        hidden_dims=[128, 64, 32], dropout_rate=0.4
     )
     nn_history = nn_classifier.train_model(
         train_loader, num_epochs=200, learning_rate=0.001
