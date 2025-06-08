@@ -3,8 +3,10 @@ import os
 import numpy as np
 import pandas as pd
 import networkx as nx
-from utils import get_playlists_tracks, get_degree_dist, plot_distributions
+from utils import get_playlists_tracks, get_degree_dist, plot_distributions, get_followers, \
+                    plot_follower_distribution
 from networkx.algorithms import bipartite
+import matplotlib.pyplot as plt
 
 
 if __name__ == "__main__":
@@ -39,11 +41,29 @@ if __name__ == "__main__":
     if projection is not None:
         print(f"Projection with {len(projection)} nodes and {projection.number_of_edges()} edges")
         print("CC in projection:", [len(c) for c in sorted(nx.connected_components(projection), key=len, reverse=True)])
-        print("edges in projection: ", len(projection.edges()))
 
+    plt.figure(figsize=(12, 9))
+    plt.subplot(2, 2, 1)
+    plot_distributions([get_degree_dist(G, tracks)], loglog=True, title="Track node degree",
+                    compute_exponent=True, colors=["black"], styles=["."], labels=["tracks"])
+    plt.subplot(2, 2, 2)
+    plot_distributions([get_degree_dist(G, playlists)], title="Playlist node degree",
+                    loglog=False, colors=["black"], styles=["."], labels=["playlists"])
 
-    plot_distributions([get_degree_dist(G, tracks)], loglog=True)
-    plot_distributions([get_degree_dist(G, playlists)], loglog=True)
-
+    plt.subplot(2, 2, 3)
     if projection is not None:
-        plot_distributions([get_degree_dist(projection)], loglog=True)
+        plot_distributions([get_degree_dist(projection)], loglog=True, title="Degree in playlist projection",
+                        compute_exponent=True, colors=["black"], styles=["."],
+                        labels=["playlists"], fit_mins=[0], fit_maxes=[200])
+
+    plt.subplot(2, 2, 4)
+    _, followers = get_followers(G)
+    flcounts = np.unique(followers, return_counts=True)
+    # plot_distributions([flcounts], loglog=True, compute_exponent=True,
+    #                 colors=["blue"], styles=["."], labels=["followers"],
+    #                 fit_mins=[0], fit_maxes=[100])
+    plot_follower_distribution(flcounts, 10, 90)
+    #plt.show()
+    plt.tight_layout()
+    os.makedirs(f"results/{gname}", exist_ok=True)
+    plt.savefig(f"results/{gname}/distributions.png")

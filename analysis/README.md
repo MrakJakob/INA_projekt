@@ -118,19 +118,19 @@ Defines paths:
 
 ## 🧬 COMMUNITY ANALYSIS
 
-### E1. `E1_detect_communities_gpu.py`
+### E1. `detect_communities_gpu.py`
 - Runs **Louvain community detection** on the projected playlist–playlist graph using cuGraph.
 - Uses `renumber=False` to preserve original playlist `id`.
 - Outputs:  
   - `community_labels.csv` containing `id`, `original_id`, and assigned `louvain` community.
 
-### E2. `E2_plot_communities_vs_followers.py`
+### E2. `plot_communities_vs_followers.py`
 - Visualizes how **follower counts vary across communities**.
 - Produces:
   - `followers_by_community_log.png`: boxplot of followers per community (log-scaled)
   - `playlist_count_per_community.png`: number of playlists per community
 
-### E3. `E3_plot_community_popularity_distribution.py`
+### E3. `plot_community_popularity_distribution.py`
 - Shows the **percentage of popular/unpopular playlists** (based on >10 follower rule) in each community.
 - Each bar represents 100% of playlists in a community:
   - **Red**: % unpopular (≤10 followers)

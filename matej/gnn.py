@@ -93,13 +93,14 @@ class _GraphSAGE(torch.nn.Module):
 class GraphSAGEBasic(BaseModel):
 
     def __init__(self, node_ft=None, ft_dim=16, hidden_dim=16, repeat_ft=False,
-                    epochs=30, lr=0.01):
+                    epochs=30, lr=0.01, projected=False):
         self.node_ft = node_ft
         self.ft_dim = ft_dim
         self.hidden_dim = hidden_dim
         self.repeat_ft = repeat_ft
         self.epochs = epochs
         self.lr = lr
+        self.projected = projected
 
     def init_data(self, G, projection, test_nodes, edges):
         
@@ -113,10 +114,13 @@ class GraphSAGEBasic(BaseModel):
             pl_ft, tr_ft = get_node_degree_ft(G, repeat=self.ft_dim if self.repeat_ft else 1)
         else:
             pl_ft, tr_ft = None, None
+        if self.projected:
+            tr_ft = None
 
-        self.data, self.id_map = prepare_torch_data(G, d=self.ft_dim, 
-                                            playlist_ft=pl_ft,
-                                            track_ft=tr_ft)
+        self.data, self.id_map = prepare_torch_data(projection if self.projected else G,
+                                                d=self.ft_dim, 
+                                                playlist_ft=pl_ft,
+                                                track_ft=tr_ft)
 
         self.model = _GraphSAGE(in_channels=self.data.num_node_features,
                             hidden_channels=self.hidden_dim,
@@ -168,8 +172,8 @@ class GraphSAGEBasic(BaseModel):
         return pred
 
 if __name__ == "__main__":
-    gdir = "graphs/test_mini"
-    gname = "test_mini"
+    gdir = "graphs/balanced_5k"
+    gname = "balanced_5k"
     G = nx.read_graphml(f"{gdir}/{gname}.graphml")
     train_df = pd.read_csv(f"{gdir}/{gname}_train.csv")
     tr_nodes, tr_buckets = np.array(train_df["nodes"]), np.array(train_df["buckets"])
@@ -177,9 +181,12 @@ if __name__ == "__main__":
     ts_nodes, ts_buckets = np.array(test_df["nodes"]), np.array(test_df["buckets"])
     edges = np.load(f"{gdir}/{gname}_edges.npy")
 
-    gs = GraphSAGEBasic(node_ft="degree", ft_dim=16, epochs=60)
+    proj_path = f"{gdir}/{gname}_projection.graphml"
+    projection = nx.read_graphml(proj_path) 
 
-    gs.init_data(G, None, ts_nodes, edges)
+    gs = GraphSAGEBasic(node_ft="name", ft_dim=384, epochs=30)
+
+    gs.init_data(G, projection, ts_nodes, edges)
     gs.train(tr_nodes, tr_buckets)
 
     pred = gs.predict(ts_nodes)
